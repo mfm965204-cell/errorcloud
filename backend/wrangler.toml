@@ -1,0 +1,16 @@
+name = "errorcloud-api"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+
+# Blind storage. The Worker prefers VAULT_R2 and falls back to VAULT_KV.
+# KV is what the deployed Worker currently uses (R2 is not enabled on the
+# account yet). KV caps a single value at 25 MiB.
+[[kv_namespaces]]
+binding = "VAULT_KV"
+id = "bb0f5f9bf2424333929732a4174fc929"
+
+# Uncomment once R2 is enabled in the Cloudflare dashboard and the
+# `vault-storage` bucket exists:
+# [[r2_buckets]]
+# binding = "VAULT_R2"
+# bucket_name = "vault-storage"

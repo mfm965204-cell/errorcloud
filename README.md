@@ -42,7 +42,8 @@ opaque ciphertext. **SSL certificate pinning** is enforced on every request.
 
 ## Backend
 
-Cloudflare Worker `errorcloud-api`, storage bucket `vault-storage`.
+Cloudflare Worker `errorcloud-api`, storage bucket `vault-storage`. The Worker
+source and its `wrangler.toml` live in [`backend/`](backend/).
 
 | Method | Path | Behaviour |
 |---|---|---|
