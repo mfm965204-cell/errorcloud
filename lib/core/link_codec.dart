@@ -35,7 +35,7 @@ class VaultLink {
       throw const FormatException('That is not a valid link.');
     }
     if (!AppConfig.acceptedSchemes.contains(uri.scheme.toLowerCase())) {
-      throw FormatException(
+      throw const FormatException(
         'A vault link starts with ${AppConfig.linkScheme}://',
       );
     }

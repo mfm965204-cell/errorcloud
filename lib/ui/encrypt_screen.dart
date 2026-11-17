@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:errorcloud/core/crypto_service.dart';
 import 'package:errorcloud/core/link_codec.dart';
@@ -394,12 +393,12 @@ class _EncryptScreenState extends State<EncryptScreen> {
                           const Spacer(),
                           CupertinoButton(
                             padding: EdgeInsets.zero,
-                            minSize: 0,
+                            minimumSize: Size.zero,
                             onPressed: () async {
                               await Clipboard.setData(
                                 ClipboardData(text: record.link),
                               );
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               await showInfoDialog(
                                 context,
                                 title: 'Copied',

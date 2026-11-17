@@ -17,7 +17,7 @@ class AppConfig {
     defaultValue: 'https://errorcloud-api.mfm965204.workers.dev',
   );
 
-  /// Scheme used for shareable links: vault://<ID>?key=<BASE64URL_KEY>
+  /// Scheme used for shareable links, e.g. `vault://ID?key=BASE64URL_KEY`.
   static const String linkScheme = 'vault';
 
   /// Schemes accepted when pasting a link (the app also answers to its own name).

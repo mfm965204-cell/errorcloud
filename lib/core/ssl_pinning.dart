@@ -37,7 +37,7 @@ class SslPinning {
   /// Pins committed to the repository. Regenerate with the
   /// `Fetch SSL pin` workflow (.github/workflows/fetch-ssl-pin.yml).
   static const List<String> committedPins = <String>[
-    // POPULATED_BY_PIN_WORKFLOW
+    'sQd0bm2o0a0ivRNjJWxv84EZHwT26VjYJs5+L56hSNU=',
   ];
 
   /// Extra pin injected at build time: `--dart-define=SSL_PIN=<base64>`.

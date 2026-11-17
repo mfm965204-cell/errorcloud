@@ -15,6 +15,12 @@ opaque ciphertext. **SSL certificate pinning** is enforced on every request.
 | Transport | TLS with SHA-256 certificate pinning |
 | CI/CD | GitHub Actions → `app-release.apk` artifact |
 
+## Live
+
+* Backend: `https://errorcloud-api.mfm965204.workers.dev` (`/health` → `{"ok":true,"storage":"kv"}`)
+* Committed certificate pin: `sQd0bm2o0a0ivRNjJWxv84EZHwT26VjYJs5+L56hSNU=`
+* Latest successful APK build: <https://github.com/mfm965204-cell/errorcloud/actions>
+
 ## How it works
 
 1. Pick a file. The app reads the bytes and generates a fresh 256-bit key and a
@@ -70,7 +76,8 @@ binding to the Worker and redeploy — the same code path then accepts up to
    the case `badCertificateCallback` cannot see: a MITM presenting a perfectly
    valid certificate from a public CA, where dart:io never calls the callback.
 
-Pins are `base64(SHA-256(DER leaf certificate))`. Two sources are combined:
+Pins are `base64(SHA-256(DER leaf certificate))`. The currently committed pin
+is `sQd0bm2o0a0ivRNjJWxv84EZHwT26VjYJs5+L56hSNU=`. Two sources are combined:
 
 * `SslPinning.committedPins` — reviewed values in the repository.
 * `--dart-define=SSL_PIN=<base64>` — injected by the CI build after resolving

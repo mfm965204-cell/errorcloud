@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:errorcloud/core/crypto_service.dart';
 import 'package:errorcloud/core/link_codec.dart';
