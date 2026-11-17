@@ -25,6 +25,20 @@ npx wrangler deploy
 The live Worker is `errorcloud-api` on
 `https://errorcloud-api.mfm965204.workers.dev`.
 
+## Current deployment note
+
+The Worker `errorcloud-api` was created from this source, but a parallel build
+later redeployed it with an equivalent variant: same three routes and the same
+request/response shapes, using the `errorcloud-storage` KV namespace and capping
+an upload at 20 MB. The app works against it unchanged (the CI smoke test in
+`build-apk.yml` uploads and re-downloads a blob against the live URL on every
+build).
+
+The source in this folder is the canonical version — it adds an R2 path, a
+100 MB cap, `HEAD` support and a 30-day KV TTL. Running `npx wrangler deploy`
+here replaces the live Worker with it and points it at the `vault-storage`
+namespace.
+
 ## Storage
 
 The Worker checks for an R2 binding named `VAULT_R2` first and falls back to the

@@ -17,7 +17,11 @@ opaque ciphertext. **SSL certificate pinning** is enforced on every request.
 
 ## Live
 
-* Backend: `https://errorcloud-api.mfm965204.workers.dev` (`/health` → `{"ok":true,"storage":"kv"}`)
+* Backend: `https://errorcloud-api.mfm965204.workers.dev` — `/health` answers
+  `{"ok":true,"service":"errorcloud-api","storage":"kv"}`. A parallel build
+  redeployed this Worker after this source was first deployed; it serves the
+  same three routes with a 20 MB upload cap. See
+  [`backend/README.md`](backend/README.md#current-deployment-note).
 * Committed certificate pin: `sQd0bm2o0a0ivRNjJWxv84EZHwT26VjYJs5+L56hSNU=`
 * Latest successful APK build: <https://github.com/mfm965204-cell/errorcloud/actions>
 
@@ -59,8 +63,8 @@ origin so the app can be pointed at the Worker from a simulator or a browser.
 The Worker prefers an R2 binding named `VAULT_R2` and falls back to a KV
 namespace named `VAULT_KV`. **R2 is not enabled on the Cloudflare account yet**
 (the API returns *"Please enable R2 through the Cloudflare Dashboard"*), so the
-deployed Worker currently uses KV. KV caps a single value at 25 MiB, so uploads
-above ~24 MiB are rejected with `413 payload_too_large`. Enable R2 in the
+deployed Worker currently uses KV, and the live variant caps an upload at 20 MB
+(`413 payload_too_large`). KV caps a single value at 25 MiB either way. Enable R2 in the
 Cloudflare dashboard, create the `vault-storage` bucket, add the `VAULT_R2`
 binding to the Worker and redeploy — the same code path then accepts up to
 100 MB per file with no other change.
