@@ -169,7 +169,7 @@ class _EncryptScreenState extends State<EncryptScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey6.withOpacity(0.25),
+                  color: CupertinoColors.systemGrey6.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

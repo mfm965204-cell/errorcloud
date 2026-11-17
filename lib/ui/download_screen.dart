@@ -243,7 +243,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
                   color: kSurface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: CupertinoColors.systemGreen.withOpacity(0.4),
+                    color: CupertinoColors.systemGreen.withValues(alpha: 0.4),
                   ),
                 ),
                 child: Row(

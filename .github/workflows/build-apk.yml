@@ -35,7 +35,7 @@ jobs:
 
       - name: Backend smoke test (upload -> download round trip)
         run: |
-          BASE=$(grep -oE 'https://[a-zA-Z0-9._-]+' lib/core/config.dart | head -1)
+          BASE=$(grep -oE 'https://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' lib/core/config.dart | head -1)
           echo "Backend: $BASE"
           curl -fsS "$BASE/health"; echo
           head -c 4096 /dev/urandom > /tmp/blob.bin
@@ -49,7 +49,7 @@ jobs:
 
       - name: Resolve live TLS pin
         run: |
-          HOST=$(grep -oE 'https://[a-zA-Z0-9._-]+' lib/core/config.dart | head -1 | sed 's#https://##')
+          HOST=$(grep -oE 'https://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' lib/core/config.dart | head -1 | sed 's#https://##')
           echo "Pinning $HOST"
           PIN=$(echo | openssl s_client -connect "$HOST:443" -servername "$HOST" 2>/dev/null \
                 | openssl x509 -outform DER | openssl dgst -sha256 -binary | base64 -w0)

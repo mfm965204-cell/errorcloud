@@ -13,7 +13,7 @@ jobs:
 
       - name: Fingerprint the live backend certificate
         run: |
-          HOST=$(grep -oE 'https://[a-zA-Z0-9._-]+' lib/core/config.dart | head -1 | sed 's#https://##')
+          HOST=$(grep -oE 'https://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' lib/core/config.dart | head -1 | sed 's#https://##')
           echo "### Pins for \`$HOST\`" >> "$GITHUB_STEP_SUMMARY"
           echo | openssl s_client -connect "$HOST:443" -servername "$HOST" -showcerts 2>/dev/null > /tmp/chain.pem
 

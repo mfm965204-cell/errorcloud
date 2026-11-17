@@ -92,9 +92,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: kAccent.withOpacity(0.14),
+                  color: kAccent.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: kAccent.withOpacity(0.4)),
+                  border: Border.all(color: kAccent.withValues(alpha: 0.4)),
                 ),
                 child: const Text(
                   AppConfig.signature,
@@ -190,7 +190,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: (_resultOk
                               ? CupertinoColors.systemGreen
                               : CupertinoColors.systemRed)
-                          .withOpacity(0.4),
+                          .withValues(alpha: 0.4),
                     ),
                   ),
                   child: Text(
