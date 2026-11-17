@@ -1,0 +1,28 @@
+name: Fetch SSL pin
+
+# Run this after a certificate rotation (or any time) to get the values that
+# belong in lib/core/ssl_pinning.dart -> committedPins.
+on:
+  workflow_dispatch:
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fingerprint the live backend certificate
+        run: |
+          HOST=$(grep -oE 'https://[a-zA-Z0-9._-]+' lib/core/config.dart | head -1 | sed 's#https://##')
+          echo "### Pins for \`$HOST\`" >> "$GITHUB_STEP_SUMMARY"
+          echo | openssl s_client -connect "$HOST:443" -servername "$HOST" -showcerts 2>/dev/null > /tmp/chain.pem
+
+          LEAF_DER=$(openssl x509 -outform DER < /tmp/chain.pem)
+          echo "Leaf SHA-256 (DER, base64): $(echo "$LEAF_DER" | openssl dgst -sha256 -binary | base64 -w0)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Leaf SPKI SHA-256 (base64): $(echo "$LEAF_DER" | openssl dgst -sha256 -binary | base64 -w0)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Validity:" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "$LEAF_DER" | openssl x509 -inform DER -noout -dates -subject -issuer | tee -a "$GITHUB_STEP_SUMMARY"
+
+          echo "Chain:" | tee -a "$GITHUB_STEP_SUMMARY"
+          awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/' /tmp/chain.pem | \
+            openssl storeutl -noout -certs /dev/stdin 2>/dev/null || true
