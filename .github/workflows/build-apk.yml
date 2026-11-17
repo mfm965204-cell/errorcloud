@@ -1,28 +1,25 @@
-name: Build APK
+name: Build Android APK
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: build-apk-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build:
-    name: Flutter release APK
+  build-apk:
+    name: Build release APK
     runs-on: ubuntu-latest
     timeout-minutes: 40
+
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -30,44 +27,24 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Scaffold Android platform
-        run: bash scripts/scaffold_android.sh
+      - name: Show Flutter version
+        run: flutter --version
 
-      - name: Backend smoke test (upload -> download round trip)
+      # Generates the android/ platform folder (gradle wrapper, MainActivity,
+      # resources) from the installed Flutter SDK, so no binaries are committed.
+      - name: Scaffold Android platform files
         run: |
-          BASE=$(grep -oE 'https://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' lib/core/config.dart | head -1)
-          echo "Backend: $BASE"
-          curl -fsS "$BASE/health"; echo
-          head -c 4096 /dev/urandom > /tmp/blob.bin
-          ID=$(curl -fsS -X POST -H 'Content-Type: application/octet-stream' \
-                --data-binary @/tmp/blob.bin "$BASE/upload" \
-                | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
-          echo "Uploaded as $ID"
-          curl -fsS "$BASE/download/$ID" -o /tmp/back.bin
-          cmp /tmp/blob.bin /tmp/back.bin
-          echo "Round trip OK"
+          flutter create --platforms=android --org com.error --project-name errorcloud /tmp/scaffold
+          cp -r /tmp/scaffold/android .
 
-      - name: Resolve live TLS pin
-        run: |
-          HOST=$(grep -oE 'https://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' lib/core/config.dart | head -1 | sed 's#https://##')
-          echo "Pinning $HOST"
-          PIN=$(echo | openssl s_client -connect "$HOST:443" -servername "$HOST" 2>/dev/null \
-                | openssl x509 -outform DER | openssl dgst -sha256 -binary | base64 -w0)
-          if [ -z "$PIN" ]; then echo "Could not resolve the certificate pin"; exit 1; fi
-          echo "Live pin: $PIN"
-          echo "SSL_PIN=$PIN" >> "$GITHUB_ENV"
+      - name: Apply app manifest
+        run: cp tool/android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
 
-      - name: Install dependencies
+      - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Analyze (informational)
-        run: flutter analyze || true
-
       - name: Build release APK
-        run: flutter build apk --release --dart-define=SSL_PIN="$SSL_PIN"
-
-      - name: Show artifact
-        run: ls -lh build/app/outputs/flutter-apk/
+        run: flutter build apk --release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

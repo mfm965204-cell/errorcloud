@@ -1,0 +1,23 @@
+name = "errorcloud-api"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Blind storage. Objects are AES-256-GCM sealed blobs; the Worker has no way to
+# decrypt them because the key never leaves the client.
+#
+# R2 is not enabled on this account, so the vault uses Workers KV (25 MiB per
+# value ceiling, hence the 24 MiB upload limit in src/index.js). To move to R2
+# later, replace this block with:
+#
+#   [[r2_buckets]]
+#   binding = "VAULT"
+#   bucket_name = "errorcloud-storage"
+#
+# and swap `env.VAULT.get/put` for `env.VAULT.get/put` (same API surface for
+# ArrayBuffer values) — the route code needs no change.
+[[kv_namespaces]]
+binding = "VAULT"
+id = "1e96ac39ff704617b60f80d7be977189"
+
+[observability]
+enabled = true

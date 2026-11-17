@@ -1,130 +1,108 @@
 # Errorcloud
 
-A zero-knowledge encrypted cloud vault. Files are sealed with **AES-256-GCM on
-the device**; the backend is a **blind storage locker** that only ever receives
-opaque ciphertext. **SSL certificate pinning** is enforced on every request.
+A zero-knowledge file encryption vault. Flutter app (iOS-style Cupertino UI on
+every platform) + Cloudflare Worker + R2 blind storage.
 
-**Developed by Error.**
+**Developed by Error**
 
-| | |
-|---|---|
-| App name | Errorcloud v1.0.0 |
-| UI | Flutter, Cupertino (native iOS look on Android and iOS) |
-| Encryption | AES-256-GCM, 256-bit key + 96-bit IV, generated per file with `Random.secure()` |
-| Backend | Cloudflare Worker + R2 (KV fallback) — `https://errorcloud-api.mfm965204.workers.dev` |
-| Transport | TLS with SHA-256 certificate pinning |
-| CI/CD | GitHub Actions → `app-release.apk` artifact |
-
-## Live
-
-* Backend: `https://errorcloud-api.mfm965204.workers.dev` — `/health` answers
-  `{"ok":true,"service":"errorcloud-api","storage":"kv"}`. A parallel build
-  redeployed this Worker after this source was first deployed; it serves the
-  same three routes with a 20 MB upload cap. See
-  [`backend/README.md`](backend/README.md#current-deployment-note).
-* Committed certificate pin: `sQd0bm2o0a0ivRNjJWxv84EZHwT26VjYJs5+L56hSNU=`
-* Latest successful APK build: <https://github.com/mfm965204-cell/errorcloud/actions>
+---
 
 ## How it works
 
-1. Pick a file. The app reads the bytes and generates a fresh 256-bit key and a
-   12-byte IV from `Random.secure()`.
-2. The file is encrypted with AES-256-GCM. The 12-byte IV is prepended to the
-   ciphertext (the GCM authentication tag is appended by the cipher).
-3. Only `IV || ciphertext || tag` is uploaded. The key is **never** sent.
-4. The app returns a shareable link:
+```
+device                                   Cloudflare
+┌───────────────────────────┐            ┌──────────────────────────┐
+│ 1. pick file              │            │                          │
+│ 2. key = Random.secure()  │            │  POST /upload            │
+│    nonce = 12 random bytes│            │   -> random 6-char id    │
+│ 3. AES-256-GCM seal       │  ciphertext│   -> R2 object           │
+│ 4. blob = nonce||ct||tag  │ ─────────► │                          │
+│ 5. link = errorcloud://   │            │  GET /download/:id       │
+│    ID?key=KEY&name=NAME   │ ◄───────── │   -> raw blob            │
+└───────────────────────────┘            └──────────────────────────┘
+```
 
-   ```
-   vault://<FILE_ID>?key=<BASE64URL_KEY>&n=<FILE_NAME>
-   ```
+The Worker only ever holds `nonce || ciphertext || GCM tag`. It never receives
+the key, the plaintext, or the file name — the file name travels inside the
+share link, base64url-encoded, so the server stays blind to it too.
 
-   The key lives in the fragment of the link, so the link is the capability —
-   anyone holding it can decrypt the file. Treat it like a password.
-5. To restore, paste the link: the app fetches the blob, splits off the first
-   12 bytes as the IV, and decrypts with the embedded key. GCM authentication
-   fails loudly if the key is wrong or the blob was tampered with.
+Share link format:
+
+```
+errorcloud://X7F9A2?key=<base64url key>&name=<base64url filename>
+```
+
+`name` is optional and only used to restore the original file name on save.
+
+## Repository layout
+
+```
+lib/                     Flutter app (Cupertino UI)
+  config.dart            app identity + locked-down API base URL
+  services/crypto_service.dart   AES-256-GCM seal/open (pointycastle)
+  services/api_client.dart       Worker client + host/scheme guard
+  services/file_service.dart     save decrypted bytes (SAF / documents dir)
+  models/share_link.dart         build + parse errorcloud:// links
+  screens/               home (tab scaffold), encrypt, decrypt, about
+worker/                  Cloudflare Worker (blind storage) + wrangler.toml
+tool/android/            manifest applied by CI (INTERNET, no cleartext)
+.github/workflows/       builds the release APK on push to main
+```
 
 ## Backend
 
-Cloudflare Worker `errorcloud-api`, storage bucket `vault-storage`. The Worker
-source and its `wrangler.toml` live in [`backend/`](backend/).
+Live: `https://errorcloud-api.mfm965204.workers.dev`
 
-| Method | Path | Behaviour |
-|---|---|---|
-| `POST` | `/upload` | Raw binary body → `201 {"id":"X7F9A2","size":12345,"storage":"r2"}` |
-| `GET` | `/download/:id` | `application/octet-stream`, `Cache-Control: no-store` |
-| `GET` | `/health` | `{"ok":true,"service":"errorcloud","storage":"r2"}` |
+| Method | Path            | Purpose                                   |
+| ------ | --------------- | ----------------------------------------- |
+| GET    | `/health`       | service banner                            |
+| POST   | `/upload`       | store raw binary, returns `{id, size}`    |
+| GET    | `/download/:id` | return the blob as `application/octet-stream` |
 
-File IDs are 6 characters from an unambiguous alphabet
-(`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`), generated with `crypto.getRandomValues`
-and checked for collisions before the blob is written. CORS is open to any
-origin so the app can be pointed at the Worker from a simulator or a browser.
-
-The Worker prefers an R2 binding named `VAULT_R2` and falls back to a KV
-namespace named `VAULT_KV`. **R2 is not enabled on the Cloudflare account yet**
-(the API returns *"Please enable R2 through the Cloudflare Dashboard"*), so the
-deployed Worker currently uses KV, and the live variant caps an upload at 20 MB
-(`413 payload_too_large`). KV caps a single value at 25 MiB either way. Enable R2 in the
-Cloudflare dashboard, create the `vault-storage` bucket, add the `VAULT_R2`
-binding to the Worker and redeploy — the same code path then accepts up to
-100 MB per file with no other change.
-
-## SSL pinning
-
-`lib/core/ssl_pinning.dart` implements two layers:
-
-1. **`badCertificateCallback`** — a chain that does not validate (self-signed,
-   unknown CA, hostname mismatch) is accepted only if the leaf certificate
-   matches a pin. Everything else is rejected during the handshake.
-2. **`assertEndpointPinned`** — a real handshake against `/health` whose leaf
-   fingerprint must match a pin *before* any file bytes are sent. This covers
-   the case `badCertificateCallback` cannot see: a MITM presenting a perfectly
-   valid certificate from a public CA, where dart:io never calls the callback.
-
-Pins are `base64(SHA-256(DER leaf certificate))`. The currently committed pin
-is `sQd0bm2o0a0ivRNjJWxv84EZHwT26VjYJs5+L56hSNU=`. Two sources are combined:
-
-* `SslPinning.committedPins` — reviewed values in the repository.
-* `--dart-define=SSL_PIN=<base64>` — injected by the CI build after resolving
-  the live certificate, so a certificate rotation can never brick a fresh build.
-
-To rotate a pin, run the **Fetch SSL pin** workflow, copy the printed value into
-`committedPins`, and commit. Cloudflare renews `workers.dev` certificates
-automatically; until the committed pin is refreshed, the build-time pin keeps
-release builds working while the committed value documents intent.
-
-With no pin configured the app refuses to connect at all (fail closed).
-
-## Building
-
-The Android platform folder is generated in CI so the Gradle/AGP/Kotlin
-versions always match the installed Flutter SDK:
+Redeploy with Wrangler:
 
 ```bash
-bash scripts/scaffold_android.sh   # creates android/ with label "Errorcloud"
-flutter pub get
-flutter build apk --release --dart-define=SSL_PIN="$(cat pin.txt)"
+cd worker
+npx wrangler r2 bucket create errorcloud-storage   # once
+npx wrangler deploy
 ```
 
-Push to `main` and GitHub Actions builds the APK:
+The Worker needs an R2 binding named `BUCKET` pointing at `errorcloud-storage`.
 
-1. Repository → **Actions** → **Build APK** → latest run.
-2. The run also smoke-tests the backend: it uploads 4 KB of random bytes,
-   downloads them back and compares the two.
-3. Scroll to **Artifacts** → `errorcloud-release-apk` → download
-   `app-release.apk`.
+## App
 
-The APK is signed with the debug keystore, which is fine for sideloading but
-must be replaced with a real keystore before publishing to the Play Store.
+```bash
+flutter pub get
+flutter run            # or: flutter build apk --release
+```
 
-## Limitations
+The API base URL lives in `lib/config.dart`. Point it at your own Worker if you
+fork this.
 
-* The link carries the key. Whoever holds the link can decrypt the file; there
-  is no second factor and no revocation.
-* There is no delete endpoint and no expiry on the client side; KV objects are
-  given a 30-day TTL server-side.
-* Decrypted files are written to the app-scoped Downloads folder
-  (`getDownloadsDirectory()`), so no storage permission is required. Use a share
-  sheet if you want them in the public Downloads folder.
-* The app icon is the default Flutter icon; add `flutter_launcher_icons` for a
-  branded one.
+## CI
+
+`.github/workflows/build-apk.yml` runs on every push to `main`:
+
+1. JDK 17 + Flutter stable
+2. `flutter create --platforms=android` into a temp dir and copy `android/` in,
+   so no Gradle wrapper binaries are committed
+3. copy `tool/android/AndroidManifest.xml` over the generated manifest
+4. `flutter pub get` then `flutter build apk --release`
+5. upload `app-release.apk` as the `errorcloud-release-apk` artifact
+
+## Security notes (read these)
+
+* **No certificate pinning, deliberately.** Cloudflare rotates the managed
+  certificate for `*.workers.dev`, so pinning its SHA-256 fingerprint would
+  hard-fail the app on the first rotation. Instead: HTTPS-only, host locked to
+  the configured Worker, `usesCleartextTraffic="false"`, and payloads encrypted
+  before they leave the device. For a production app with a custom domain, pin
+  the SPKI hash of *your* domain with a backup pin.
+* **The link is the key.** There is no recovery path: lose the link and the
+  file is gone. That is the point of zero-knowledge, but it is worth stating.
+* **6-character ids** give roughly 1.07 billion combinations, and the key is a
+  separate 256-bit secret, so an id alone is useless. Ids are still enumerable
+  by an attacker hammering `/download/:id`; add Cloudflare rate limiting before
+  opening this to the public.
+* **No delete / expiry yet.** Objects live in R2 until removed manually.
+* Metadata the server can still infer: blob size and upload time.
